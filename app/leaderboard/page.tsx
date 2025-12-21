@@ -5,6 +5,8 @@ import { Team1 } from "@/components/team1";
 import { supabase } from "@/lib/supabaseClient";
 import { useStudents, Student } from "@/providers/zustand";
 
+type DBStudent = { id: string; name: string; marks?: number[] | null };
+
 const LeaderBoard = () => {
     const team1 = useStudents((s) => s.students);
     const setTeam1 = useStudents((s) => s.setStudents);
@@ -22,7 +24,10 @@ const LeaderBoard = () => {
                 return;
             }
 
-            const rows = (data || []).map((r: any) => ({ id: r.id, name: r.name, marks: r.marks || [] }));
+            const rows = (data || []).map((r) => {
+                const rr = r as DBStudent;
+                return { id: rr.id, name: rr.name, marks: rr.marks || [] };
+            });
             if (mounted) setTeam1(rows as Student[]);
         };
 
@@ -36,7 +41,7 @@ const LeaderBoard = () => {
                 { event: "INSERT", schema: "public", table: "students" },
                 (payload) => {
                     if (!mounted) return;
-                    const newRow = payload.new as any;
+                    const newRow = payload.new as DBStudent;
                     addStudent({ id: newRow.id, name: newRow.name, marks: newRow.marks || [] });
                 }
             )
@@ -45,7 +50,7 @@ const LeaderBoard = () => {
                 { event: "UPDATE", schema: "public", table: "students" },
                 (payload) => {
                     if (!mounted) return;
-                    const updated = payload.new as any;
+                    const updated = payload.new as DBStudent;
                     updateStudent({ id: updated.id, name: updated.name, marks: updated.marks || [] });
                 }
             )
@@ -54,7 +59,7 @@ const LeaderBoard = () => {
                 { event: "DELETE", schema: "public", table: "students" },
                 (payload) => {
                     if (!mounted) return;
-                    const oldRow = payload.old as any;
+                    const oldRow = payload.old as DBStudent;
                     removeStudent(oldRow.id);
                 }
             )
@@ -64,7 +69,7 @@ const LeaderBoard = () => {
             mounted = false;
             try {
                 channel.unsubscribe();
-            } catch (e) {
+            } catch {
                 // ignore unsubscribe errors
             }
         };

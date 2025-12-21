@@ -21,23 +21,23 @@ export const Navbar = () => {
       // Fetch all student ids first
       const { data: students, error: fetchError } = await supabase.from("students").select("id");
       if (fetchError) throw fetchError;
-
-      const ids = (students || []).map((s: any) => s.id).filter(Boolean);
+      const ids = (students || []).map((s: { id: string | null }) => s.id).filter(Boolean) as string[];
       if (ids.length === 0) {
         alert("No students to clear.");
         return;
       }
 
-      const { data, error } = await supabase.from("students").delete().in("id", ids);
+      const { error } = await supabase.from("students").delete().in("id", ids);
       if (error) throw error;
 
       // Clear local store so UI updates immediately
       useStudents.getState().setStudents([]);
 
       alert("All students cleared successfully!");
-    } catch (error: any) {
-      console.error("Error clearing students:", error);
-      alert(error?.message || "Failed to clear students. See console for details.");
+    } catch (err: unknown) {
+      console.error("Error clearing students:", err);
+      const error = err as { message?: string } | Error;
+      alert((error && 'message' in error && error.message) || "Failed to clear students. See console for details.");
     }
   };
 
