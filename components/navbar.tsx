@@ -10,23 +10,36 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { supabase } from "@/lib/supabaseClient";
+import { useStudents } from "@/providers/zustand";
 
 export const Navbar = () => {
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
-  const addStudent = useMutation(api.student.addStudent);
-  const clearStudent = useMutation(api.student.clearStudents);
-
   const handleClear = async () => {
     try {
-      await clearStudent();
+      // Fetch all student ids first
+      const { data: students, error: fetchError } = await supabase.from("students").select("id");
+      if (fetchError) throw fetchError;
+
+      const ids = (students || []).map((s: any) => s.id).filter(Boolean);
+      if (ids.length === 0) {
+        alert("No students to clear.");
+        return;
+      }
+
+      const { data, error } = await supabase.from("students").delete().in("id", ids);
+      if (error) throw error;
+
+      // Clear local store so UI updates immediately
+      useStudents.getState().setStudents([]);
+
       alert("All students cleared successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error clearing students:", error);
+      alert(error?.message || "Failed to clear students. See console for details.");
     }
-  }
+  };
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -35,7 +48,17 @@ export const Navbar = () => {
     }
 
     try {
-      await addStudent({ name: name.trim(), marks: [] });
+      // Insert and get the created row back so UI can be updated immediately
+      const { data, error } = await supabase
+        .from("students")
+        .insert([{ name: name.trim(), marks: [] }])
+        .select("id, name, marks")
+        .single();
+      if (error) throw error;
+
+      // Optimistically update client-side store so UI reflects addition immediately
+      useStudents.getState().addStudent({ id: data.id, name: data.name, marks: data.marks || [] });
+
       setName("");
       setOpen(false);
     } catch (error) {

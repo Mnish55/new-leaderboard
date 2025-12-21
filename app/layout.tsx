@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 // import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ConvexClientProvider } from "@/providers/convex-provider";
+// Using Supabase instead of Convex; no provider wrapper needed here.
 
 // const geistSans = Geist({
 //   variable: "--font-geist-sans",
@@ -25,13 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="hydrated">
-      <body
-        className="h-full w-full"
-      >
-        <ConvexClientProvider>
-          {children}
-        </ConvexClientProvider>
-      </body>
+      <body className="h-full w-full">{children}</body>
     </html>
   );
 }

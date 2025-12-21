@@ -2,68 +2,76 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "./ui/button";
 import { Plus } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useCounterTeam1, useScoreTeam1 } from "@/providers/zustand";
+import { supabase } from "@/lib/supabaseClient";
+import { useCounterTeam1, useScoreTeam1, useStudents } from "@/providers/zustand";
 import { useEffect } from "react";
+import React from "react";
 
 type Student = {
+  id: string;
   name: string;
   marks: number[];
 }
 
-export const Team1 = ({ name, marks }: Student) => {
+export const Team1 = ({ id, name, marks }: Student) => {
   const { counterTeam1, setCounterTeam1, increaseCounterTeam1 } = useCounterTeam1();
-  const { scoreTeam1, setScoreTeam1, increaseScoreTeam1} = useScoreTeam1()
-  const totalStudent = useQuery(api.student.getStudentsTeam1)
-  const totalNumberOfStudents = totalStudent?.length || 0;
-  const addZero  = useMutation(api.student.addZero);
+  const { scoreTeam1, setScoreTeam1, increaseScoreTeam1 } = useScoreTeam1();
+  const totalNumberOfStudents = useStudents((s) => s.students.length);
+
   const arr = [...Array(totalNumberOfStudents)].map((_, i) => totalNumberOfStudents - i);
 
-
   useEffect(() => {
-  if (counterTeam1 === totalNumberOfStudents) {
-    setScoreTeam1(0);
-  }
-}, [counterTeam1, totalNumberOfStudents, setScoreTeam1]);
-  
+    if (counterTeam1 === totalNumberOfStudents) {
+      setScoreTeam1(0);
+    }
+  }, [counterTeam1, totalNumberOfStudents, setScoreTeam1]);
 
   const increaseCounterByOne = () => {
     if (counterTeam1 == totalNumberOfStudents) {
-      setCounterTeam1(1)
+      setCounterTeam1(1);
     } else {
       increaseCounterTeam1();
     }
-  }
+  };
 
+  const handleZero = async (id: string) => {
+    const prev = marks;
+    const newMarks = [...(prev || []), 0];
 
-  const handleZero = async (name: string) => {
+    // optimistic update
+    useStudents.getState().updateStudent({ id, name, marks: newMarks });
+
     try {
-       await addZero({
-       name: name,
-       newMarks: [...marks, 0],})
-       increaseCounterByOne();
-      } catch (error) {
-        console.error("Error adding zero:", error);
-        alert("Failed to add zero. Please try again.");
+      const { error } = await supabase.from("students").update({ marks: newMarks }).eq("id", id);
+      if (error) throw error;
+      increaseCounterByOne();
+    } catch (error) {
+      console.error("Error adding zero:", error);
+      // rollback
+      useStudents.getState().updateStudent({ id, name, marks: prev });
+      alert("Failed to add zero. Please try again.");
     }
-     
-  }
+  };
 
-  const handleMarks = async (name: string) => {
+  const handleMarks = async (id: string) => {
+    const prev = marks;
+    const newMarks = [...(prev || []), arr[scoreTeam1]];
+
+    // optimistic update
+    useStudents.getState().updateStudent({ id, name, marks: newMarks });
+
     try {
-       await addZero({
-       name: name,
-       newMarks: [...marks, arr[scoreTeam1]],})
-       increaseScoreTeam1();
-       increaseCounterByOne();
-       console.log("array wala count",counterTeam1)
-      } catch (error) {
-        console.error("Error adding zero:", error);
-        alert("Failed to add zero. Please try again.");
+      const { error } = await supabase.from("students").update({ marks: newMarks }).eq("id", id);
+      if (error) throw error;
+      increaseScoreTeam1();
+      increaseCounterByOne();
+    } catch (error) {
+      console.error("Error adding mark:", error);
+      // rollback
+      useStudents.getState().updateStudent({ id, name, marks: prev });
+      alert("Failed to add mark. Please try again.");
     }
-     
-  }
+  };
 
   return (
     <div className="flex pt-2 p-2 h-full">
@@ -71,8 +79,8 @@ export const Team1 = ({ name, marks }: Student) => {
         <CardHeader className="border-b flex-col text-xl font-bold border-gray-800 flex items-center">
           {name}
           <div className="flex space-x-6 mt-2">
-            <Button onClick={() => handleZero(name)} className="bg-red-500 rounded-lg">0</Button>
-            <Button onClick={() => handleMarks(name)} className="bg-green-500 rounded-lg">
+            <Button onClick={() => handleZero(id)} className="bg-red-500 rounded-lg">0</Button>
+            <Button onClick={() => handleMarks(id)} className="bg-green-500 rounded-lg">
               <Plus className="h-1 w-1"/>
             </Button>
           </div>
